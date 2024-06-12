@@ -1,0 +1,1 @@
+{"resources":{"Scripts/first.sql":{"default-datasource":"mysql8-1900a129029-51d8607c31cf80d5","default-catalog":"sakila"},"Scripts/sakila/Script.sql":{"default-catalog":"sakila","default-datasource":"mysql8-1900a129029-51d8607c31cf80d5"}}}
