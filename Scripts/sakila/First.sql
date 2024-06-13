@@ -1,3 +1,7 @@
+-- New script in sakila.
+-- Date: 2024. 6. 13.
+-- Time: 오후 4:31:51
+
 SELECT *
 FROM actor;
 

@@ -1,85 +1,33 @@
 -- New script in sakila.
--- Date: 2024. 6. 12.
--- Time: 오후 3:40:19
+-- Date: 2024. 6. 13.
+-- Time: 오전 11:46:30
+-- Site : https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_date
 
-/* ---------------------- 쿼리 입문 ---------------------- */
+/* ----------------------- Date and Time Functions ------------------------ */
 
-SELECT FIRST_NAME , last_name
-FROM CUSTOMER C 
-WHERE LAST_NAME LIKE '%Z%';
+-- selects all rows with a RETURN_DATE value from within the last 20 years
+-- DATE_SUB(날짜, interval day/month/year) : 날짜에서 시간 값(간격) 빼기
+-- CURDATE() : 현재 날짜 반환
+SELECT *
+    FROM RENTAL R 
+WHERE DATE_SUB(CURDATE(), INTERVAL 20 YEAR) <= RETURN_DATE; 
 
-SELECT * FROM CATEGORY C ;
+-- “zero” dates or incomplete dates such as '2001-11-00' 
+-- return 0
+SELECT DAYOFMONTH('2001-11-00'), MONTH('2005-00-00');
 
-SELECT * FROM `language` l;
+-- expect complete dates and return NULL for incomplete dates
+-- DATE_ADD(날짜, interval day/month/year) : 날짜 값에 시간 값(interval) 추가
+-- ADDDATE(날짜, interval day/month/year) 와 동일
+SELECT DATE_ADD('2006-05-00', INTERVAL 1 DAY);
+SELECT DAYNAME('2006-05-54'); 
 
-SELECT UPPER(name), name 
-FROM `language` l ;
+SELECT DATE_ADD('2008-01-02', INTERVAL 31 DAY); 
+SELECT ADDDATE('2008-01-02', INTERVAL 31 DAY); 
 
-SELECT USER(), DATABASE();
-
-SELECT actor_id
-FROM FILM_ACTOR FA 
-    USE INDEX (PRIMARY);
-
--- 고객의 이름을 합쳐서 출력 
-SELECT CONCAT(LAST_NAME, ',', FIRST_NAME) 
-FROM CUSTOMER C ;
-
--- 고객의 이름을 합쳐서 출력 - from 절에 select 문
-SELECT CONCAT(a.LAST_NAME, ',', a.FIRST_NAME) 
-    , a.email
-    FROM (
-            SELECT c.FIRST_NAME , c.LAST_NAME , c.EMAIL 
-            FROM CUSTOMER C 
-            WHERE c.FIRST_NAME = 'JESSIE'
-        ) a;
-
--- 중복 제거
-SELECT DISTINCT(ACTOR_ID), FILM_ID 
-FROM FILM_ACTOR FA ;
-
--- 테이블 생성시, select 활용 - 테이블 생성과 동시에 데이터 입력
-CREATE TEMPORARY TABLE actor_j (
-    actor_id SMALLINT(5),
-    first_name varchar(45),
-    last_name varchar(45)
-);
-
-SELECT * FROM actor_j;
-
-INSERT INTO actor_j
-SELECT ACTOR_ID , FIRST_NAME , LAST_NAME 
-    FROM ACTOR 
-WHERE LAST_NAME LIKE 'J%';
+-- ADDTIME(expr1,expr2)
+SELECT ADDTIME('2007-12-31 23:59:59.999999', '1 1:1:1.000002');
+SELECT ADDTIME('01:00:00.999999', '02:00:00.999998');
 
 
-/* View 생성 */
-CREATE VIEW cust_v AS 
-SELECT customer_id, first_name, last_name, active
-    FROM CUSTOMER C;
 
-SELECT * FROM CUST_V CV ;
-
-/* Join 
- * 대상 테이블 : Customer, Rental
- * */
-SELECT * FROM CUSTOMER C ;
-SELECT * FROM RENTAL R ;
-
-SELECT c.FIRST_NAME , c.LAST_NAME 
-    , r.RENTAL_DATE , r.RETURN_DATE 
-    , count(*) OVER() cnt
-    FROM CUSTOMER C 
-        INNER JOIN RENTAL R 
-        ON c.CUSTOMER_ID = r.CUSTOMER_ID
-    WHERE c.FIRST_NAME = 'MARY'
-    AND date(r.RENTAL_DATE ) = '2005-05-25';
-
-    
-    
-    
-    
-    
-    
-    
-    

@@ -172,7 +172,15 @@
               ORDER BY; : 정렬
         - DDL(CREATE, ALTER, DROP)
         - TCL(ROLLBACK, COMMIT)
-        - 
+    
+    2-4. View
+        - 가상의 테이블이라고 생각하고,
+        - select 문장에 이름을 부여해서, 부여된 이름을 마치 테이블의 이름처럼 사용
+        - 목적 
+          SELECT 문장의 재사용
+          긴 SQL 문장의 가독성을 위함
+          실제 table 의 사용 제한을 줄 수 있음
+          
     
     
     
