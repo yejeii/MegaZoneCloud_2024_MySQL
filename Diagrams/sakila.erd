@@ -23,7 +23,7 @@
 			<entity id="7" name="film" fq-name="sakila.film" order="6" font="Segoe UI:9:0" x="702" y="718">
 				<path name="sakila"/>
 			</entity>
-			<entity id="8" name="film_actor" fq-name="sakila.film_actor" order="7" border-width="3" font="Segoe UI:9:0" x="491" y="1034">
+			<entity id="8" name="film_actor" fq-name="sakila.film_actor" order="7" font="Segoe UI:9:0" x="491" y="1034">
 				<path name="sakila"/>
 			</entity>
 			<entity id="9" name="film_category" fq-name="sakila.film_category" order="8" font="Segoe UI:9:0" x="500" y="1222">
@@ -41,7 +41,7 @@
 			<entity id="13" name="payment" fq-name="sakila.payment" order="12" font="Segoe UI:9:0" x="96" y="140">
 				<path name="sakila"/>
 			</entity>
-			<entity id="14" name="rental" fq-name="sakila.rental" order="13" font="Segoe UI:9:0" x="320" y="141">
+			<entity id="14" name="rental" fq-name="sakila.rental" order="13" border-width="3" font="Segoe UI:9:0" x="310" y="86">
 				<path name="sakila"/>
 			</entity>
 			<entity id="15" name="staff" fq-name="sakila.staff" order="14" font="Segoe UI:9:0" x="955" y="40">
