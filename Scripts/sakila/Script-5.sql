@@ -73,7 +73,6 @@ WHERE AMOUNT = 0;   -- 24
  *                                -> AI 를 이 고객에게 추천 서비스를 제공토록 해야함.
  * 
  */
-
 SELECT CUSTOMER_ID 
     , MAX(AMOUNT) max_amt
     , MIN(AMOUNT) min_amt   

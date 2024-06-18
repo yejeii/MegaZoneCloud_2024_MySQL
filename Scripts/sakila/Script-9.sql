@@ -1,0 +1,3 @@
+-- New script in sakila.
+-- Date: 2024. 6. 18.
+-- Time: 오후 3:06:20

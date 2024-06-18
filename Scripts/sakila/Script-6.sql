@@ -182,7 +182,6 @@ WHERE (ACTOR_ID , FILM_ID ) IN (
  * 5. Main query 20번 대여 횟수가 동일한지 확인
  * 
  */           
-EXPLAIN
 SELECT c.CUSTOMER_ID, c.FIRST_NAME , c.LAST_NAME 
     FROM CUSTOMER C 
 WHERE 20 = (
@@ -193,7 +192,6 @@ WHERE 20 = (
                
 select count(*) from rental r where r.customer_id = 191;     
 
-EXPLAIN
 SELECT c.CUSTOMER_ID, c.FIRST_NAME , c.LAST_NAME 
     FROM CUSTOMER C 
     JOIN RENTAL R 
@@ -208,7 +206,6 @@ HAVING count(*) = 20;
  * 
  * 대여 총 지불액이 180 달러에서 240 달러 사이인 모든 고객 리스트
  */
-EXPLAIN
 SELECT c.CUSTOMER_ID, c.FIRST_NAME, c.LAST_NAME 
     FROM CUSTOMER C 
 WHERE ( 
@@ -226,7 +223,6 @@ WHERE (
  */
 
 /* 2005-05-25 일 이전에 한 편 이상의 영화를 대여한 모든 고객 */
-EXPLAIN 
 SELECT c.FIRST_NAME , c.LAST_NAME 
     FROM CUSTOMER C 
 WHERE EXISTS (
@@ -235,6 +231,7 @@ WHERE EXISTS (
                 WHERE r.CUSTOMER_ID = c.CUSTOMER_ID 
                 AND r.RENTAL_DATE < '2005-05-25'
             );
+
 /*
  * EXISTS 문에서 "SELECT 1" 을 하는 이유가 뭘까?
  * 
@@ -548,6 +545,7 @@ ORDER BY 3 DESC;
  * 단, 정렬 조건은 영화 배우가 출연한 영화수로 내림차순 정렬이 되도록 하고,
  * 정렬 조건을 Sub Query로 작성할 것.
  * */
+-- 내가 한 코드 : 비용이 세다..
 SELECT a.FIRST_NAME , a.LAST_NAME 
     , actor_cnt.cnt
     FROM ACTOR A 
@@ -559,23 +557,96 @@ SELECT a.FIRST_NAME , a.LAST_NAME
         ) actor_cnt
     ON a.ACTOR_ID = actor_cnt.actor_id
 ORDER BY 3 DESC;
-       
+
+-- 강사님이 한 코드 : 연관 관계 subQuery
+SELECT a.actor_id, a.first_name, a.last_name
+    FROM ACTOR A 
+ORDER BY (
+            SELECT COUNT(*)
+                FROM FILM_ACTOR FA 
+            WHERE fa.ACTOR_ID = a.ACTOR_ID
+        ) DESC;
+    
+/*
+ * 스칼라 서브쿼리
+ * 
+ * SELECT 절에 사용되는 서브 쿼리
+ * - 칼럼의 형태 -> 하나의 열로 사용할 수 있도록 해야 함
+ * - 반드시 하나의 결과만 반환되도록 해야 함 -> 연관 관계임을 나타냄
+ */
+
+SELECT 
+    c.FIRST_NAME , c.LAST_NAME , c2.CITY , a.amt AS "총 대여 지불 금액", a.cnt AS "총 대여 횟수"
+    FROM (
+            SELECT p.CUSTOMER_ID, sum(p.amount) amt, count(*) cnt
+                FROM PAYMENT P 
+            GROUP BY p.CUSTOMER_ID 
+        ) a
+    JOIN CUSTOMER C 
+    ON a.customer_id = c.CUSTOMER_ID 
+    JOIN ADDRESS AD
+    ON c.ADDRESS_ID = ad.ADDRESS_ID 
+    JOIN CITY C2 
+    ON ad.CITY_ID = c2.CITY_ID ; 
+
+/*
+ * 위 쿼리를 스칼라 형식으로 변경해보기
+ * 
+ * 1. Main Query 의 from 절에 사용할 테이블 결정
+ *    PAYMENT : 한 번이라도 결제한 고객이 대상
+ * 2. first_name : 서브 쿼리 + 조건(연관 관계 - PAYMENT)
+ * 3. last_name : 서브 쿼리 + 조건(연관 관계 - PAYMENT)
+ * 4. city 
+ *    서브 쿼리(CUSTOMER, ADDRESS, CITY) + 조건(연관 관계 - PAYMENT)
+ * 5. 총 대여 지불 금액, 총 대여 횟수
+ *    Main Query 의 from 절 테이블 이용, 집계 함수로 통계 처리
+ * 6. Main Query 에 group by 적용
+ */    
+SELECT (   
+        SELECT c.first_name
+            FROM CUSTOMER C 
+        WHERE c.customer_id = p.CUSTOMER_ID 
+        ) AS first_name 
+    , (
+        SELECT c.last_name
+            FROM CUSTOMER C 
+        WHERE c.customer_id = p.CUSTOMER_ID
+        ) AS last_name
+    , (
+        SELECT cc.city
+            FROM CUSTOMER C 
+            JOIN ADDRESS A 
+            ON c.address_id = a.address_id
+            JOIN CITY CC
+            ON a.city_id = cc.city_id
+        WHERE c.customer_id = p.CUSTOMER_ID
+        ) AS city
+    , sum(p.amount) AS "총 대여 지불 금액"
+    , count(*) AS "총 대여 횟수"
+    FROM PAYMENT P 
+GROUP BY p.CUSTOMER_ID;
+
 /* 
  * 대여 가능한 DVD 영화 리스트를 조회.
  * film id, 제목, 재고수가 조회도록 SQL 작성. 
  * 
- * 단, 모든 영화가 빠짐없이 조회가 되도록 해야 하며
+ * 단, 모든 영화가 빠짐없이 조회가 되도록 해야 함
+ * -> film 에는 데이터가 있지만, inventory 에는 데이터가 없는 경우 -> outer join 
+ * 
  * */
 SELECT count(*) FROM FILM F ;   -- 1000
 
-SELECT f.FILM_ID , f.TITLE , inven_cnt.cnt
+/*
+ * COUNT() 의 값이 NULL -> 0 으로 처리함
+ * INVENTORY 테이블의 film_id = 14 인 데이터는 존재하지 않음
+ */
+SELECT f.FILM_ID , f.TITLE , count(i.INVENTORY_ID)
     FROM FILM F 
-    JOIN (
-            SELECT FILM_ID, COUNT(*) AS cnt -- 958
-                FROM INVENTORY I 
-            GROUP BY FILM_ID
-        ) inven_cnt
-    ON f.FILM_ID = inven_cnt.film_id;
+    LEFT OUTER JOIN INVENTORY I 
+    ON f.FILM_ID = i.film_id
+GROUP BY f.FILM_ID, f.TITLE ;
+
+SELECT * FROM INVENTORY I WHERE FILM_ID = 14;   -- X
         
 /* 
  * 대여 가능한 DVD 영화 리스트를 조회.
@@ -583,20 +654,25 @@ SELECT f.FILM_ID , f.TITLE , inven_cnt.cnt
  * 
  * 단, 모든 영화가 빠짐없이 조회가 되도록 해야 하며
  * film_id 는 13,14,15 로 한정
+ * 
+ * 필요한 테이블 : film, inventory, rental
+ * film 정보가 inventory 뿐만 아니라, rental 에도 없는 경우가 있음
+ * 이런 경우의 join 은...?
  * */
-SELECT f.FILM_ID , f.TITLE , inven.INVENTORY_ID, r.RENTAL_DATE 
+SELECT f.FILM_ID , f.TITLE , i.INVENTORY_ID, r.RENTAL_DATE 
 -- SELECT count(*) -- 31
     FROM FILM F 
-    JOIN (
-            SELECT INVENTORY_ID , FILM_ID   -- 10
-                FROM INVENTORY I 
-            WHERE FILM_ID IN (13,14,15)
-        ) inven
-    ON f.FILM_ID = inven.film_id
-    JOIN RENTAL R 
-    ON inven.inventory_id = r.INVENTORY_ID 
+    LEFT OUTER JOIN INVENTORY I /* film 테이블 기준 : left */
+    ON f.FILM_ID = i.film_id
+    LEFT OUTER JOIN RENTAL R    /* inventory 테이블 기준 : left */
+    ON i.inventory_id = r.INVENTORY_ID 
+WHERE f.FILM_ID BETWEEN 13 AND 15;
 
-/* 0 ~ 399 */
+/* 
+ * cross join(교차 조인) : 카타시안 프러덕트, 임시 테스트용 데이터 생성 
+ * 
+ * 0 ~ 399 : DATE_ADD() , interval 용 데이터(DAY, MONTH, YEAR)
+ * */
 CREATE VIEW calendat_v AS 
 (
     SELECT ones.num + tens.num + hundreds.num AS nm
@@ -644,20 +720,64 @@ CREATE TEMPORARY TABLE cal_temp (
 CALL ADDCALENDAR();
 SELECT * FROM cal_temp;
 
- /*
-  * 상기의 달력을 만든 후, RENTAL 테이블의 rental_date(대여일)별로 대여 수 조회
-  * 단, 검색 기간은 2005 년도에 한해서만 조회
-  */
-SELECT count(*) OVER() -- 40
-FROM RENTAL R 
-WHERE r.RENTAL_DATE LIKE '2005%' 
-GROUP BY date(r.RENTAL_DATE);     
 
-SELECT t.new_date, count(*)
+-- 방법 2.
+SELECT DATE_ADD('2005-01-01', INTERVAL(ones.num + tens.num + hundreds.num) DAY) dt
+FROM 
+     (SELECT 0 num UNION ALL
+     SELECT 1 num UNION ALL
+     SELECT 2 num UNION ALL
+     SELECT 3 num UNION ALL
+     SELECT 4 num UNION ALL
+     SELECT 5 num UNION ALL
+     SELECT 6 num UNION ALL
+     SELECT 7 num UNION ALL
+     SELECT 8 num UNION ALL
+     SELECT 9 num) ones
+     CROSS JOIN
+     (SELECT 0 num UNION ALL
+     SELECT 10 num UNION ALL
+     SELECT 20 num UNION ALL
+     SELECT 30 num UNION ALL
+     SELECT 40 num UNION ALL
+     SELECT 50 num UNION ALL
+     SELECT 60 num UNION ALL
+     SELECT 70 num UNION ALL
+     SELECT 80 num UNION ALL
+     SELECT 90 num) tens
+     CROSS JOIN
+     (SELECT 0 num UNION ALL
+     SELECT 100 num UNION ALL
+     SELECT 200 num UNION ALL
+     SELECT 300 num) hundreds
+WHERE DATE_ADD('2005-01-01', INTERVAL(ones.num + tens.num + hundreds.num) DAY) < '2006-01-01'
+ORDER BY 1;
+
+/*
+ * 상기의 달력을 만든 후, RENTAL 테이블의 rental_date(대여일)별로 대여 수 조회
+ * 단, 검색 기간은 2005 년도에 한해서만 조회
+ * 
+ * Main query : rental 테이블  (left)
+ * Sub queryy : 달력 테이블      (right)
+ * 
+ * 두 테이블의 관계 : 달력의 데이터가 RENTAL 테이블엔 없을 수 있음 
+ *                -> right outer join (가독성을 위한 right 조인)
+ */
+SELECT date(r.RENTAL_DATE) AS rent_date
+    , count(*) AS tot_day_rental
     FROM RENTAL R 
-    JOIN cal_temp t
-    ON t.new_date = date(r.RENTAL_DATE)
-GROUP BY t.new_date;
+    RIGHT OUTER JOIN cal_temp cal
+    ON date(r.RENTAL_DATE) = cal.new_date
+WHERE r.RENTAL_DATE IS NOT NULL
+GROUP BY date(r.RENTAL_DATE);
+ 
+SELECT calendar.new_date
+    , count(r.rental_id) tot_day_rental
+    FROM RENTAL R 
+    RIGHT OUTER JOIN cal_temp calendar
+    ON calendar.new_date = date(r.RENTAL_DATE)
+GROUP BY calendar.new_date
+ORDER BY 1;
 
 
 
