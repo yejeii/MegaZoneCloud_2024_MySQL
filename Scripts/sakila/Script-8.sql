@@ -64,6 +64,8 @@ SELECT CUSTOMER_ID
     FROM CUSTOMER C ;
 
 /*
+ * 목적 : 복잡성 낮추기
+ * 
  * 각 영화 정보에 대해서 
  * film_id, title, description, rating 가 출력이 되고,
  * 추가적으로 각 영화에 대한 영화 카테고리, 영화 출연 배우의 수,
@@ -72,28 +74,30 @@ SELECT CUSTOMER_ID
  * film 의 기본 칼럼을 제외하고 나머지 4개의 데이터는 스칼라 서브쿼리.
  * 그리고, 이 스칼라 서브쿼리는 연관 관계의 조건 설정이 필요.
  * 
+ * 공통화 작업, 가독성 높이고, 유지보수 향상되도록 -> 스칼라 서브쿼리
  */
+CREATE VIEW film_total_info AS 
 SELECT f.FILM_ID , f.TITLE , f.DESCRIPTION , f.RATING 
     , ( SELECT c.name
             FROM FILM_CATEGORY FC 
             JOIN CATEGORY C 
-            ON fc.category_id = c.category_id
-            WHERE f.FILM_ID = fc.film_id
-        ) AS name
+            ON fc.category_id = c.category_id   /* 일반적인 inner join.. 다중 행이 출력된다. */
+            WHERE f.FILM_ID = fc.film_id        /* 스칼라 서브쿼리.. 한 건만 출력시키기 위해 상관관계를 맺어준다. */
+        ) AS name           -- 영화에 대한 영화 카테고리 정보
     , ( SELECT count(*)
             FROM FILM_ACTOR FA 
         WHERE f.FILM_ID = fa.film_id
-        ) AS actor_cnt
+        ) AS actor_cnt      -- 영화 출연 배우 수
     , ( SELECT count(*)
             FROM INVENTORY I 
         WHERE f.FILM_ID = i.film_id
-        ) AS inven_cnt
+        ) AS inven_cnt      -- 총 재고 수
     , ( SELECT count(*) 
             FROM INVENTORY I
             JOIN RENTAL R 
             ON i.inventory_id = r.inventory_id
         WHERE f.FILM_ID = i.film_id
-        ) AS rent_cnt
+        ) AS rent_cnt       -- 영화 대여횟수
     FROM FILM F ;
 
 -- 검증
@@ -123,14 +127,25 @@ SELECT count(*)                 -- count : OK
     ON r.INVENTORY_ID = i.INVENTORY_ID 
 WHERE i.FILM_ID = 1;
 
+SELECT *
+    FROM film_total_info;
 
 /*
- * 영화 카테고리별 총 대여량을 조회하는 View 생성
+ * 영화 카테고리별 총 대여금액을 조회하는 View 생성
+ * 
+ * 영화 제작시 발생하는 투자금에 대한 ROI 를 높이고, 안정적이고 지속적이고 높은 ROI 를 확보하기 위한 정보를 가공
+ * 
+ * 담당하는 개발자는 도메인 지식이 높아야 하며, 정확한 분석, 사용자를 배려한 SQL 을 작성해야 함.
+ * - 유지보수성, 안정성, 가독성 등등 고려
+ * 
+ * 필요 정보 : 영화 카테고리명, 카테고리별 총 대여금액(SUM(PAYMENT.AMOUNT)), 
+ * 필요한 테이블 : PAYMENT, RENTAL, INVENTORY, FILM, FILM_CATEGORY, CATEGORY
  */
-CREATE VIEW film_cat_rentTot_v as
+-- 내가 한 코드
+CREATE OR REPLACE VIEW film_cat_rentTot_v as
 SELECT c.NAME ,
     (
-        SELECT count(*)
+        SELECT sum(p.amount)
             FROM FILM_CATEGORY FC 
             JOIN FILM F 
             ON fc.FILM_ID = f.FILM_ID 
@@ -138,14 +153,35 @@ SELECT c.NAME ,
             ON f.FILM_ID = i.FILM_ID 
             JOIN RENTAL R 
             ON i.INVENTORY_ID = r.INVENTORY_ID 
+            JOIN PAYMENT P 
+            ON r.rental_id = p.rental_id
         WHERE c.CATEGORY_ID = fc.CATEGORY_ID 
     ) AS cat_rental_tot
-FROM CATEGORY C;
+FROM CATEGORY C
+ORDER BY 2 DESC; 
 
+-- 강사님이 한 코드
+SELECT c.NAME , sum(p.amount) AS tot_rental_amount
+    FROM CATEGORY C 
+    JOIN FILM_CATEGORY FC 
+    ON c.CATEGORY_ID = fc.CATEGORY_ID 
+    JOIN FILM F 
+    ON fc.FILM_ID = f.FILM_ID 
+    JOIN INVENTORY I 
+    ON f.FILM_ID = i.FILM_ID 
+    JOIN RENTAL R 
+    ON i.INVENTORY_ID = r.INVENTORY_ID 
+    JOIN PAYMENT P 
+    ON r.rental_id = p.rental_id
+GROUP BY c.NAME 
+ORDER BY 2 DESC;
+    
 -- 검증
--- Action 1112
-SELECT count(*) -- 1112
-    FROM RENTAL R 
+-- Action 4375.85
+SELECT sum(p.amount) -- 4375.85
+    FROM PAYMENT P 
+    JOIN RENTAL R 
+    ON p.rental_id = r.rental_id
     JOIN INVENTORY I 
     ON r.INVENTORY_ID = i.INVENTORY_ID 
     JOIN FILM F 
@@ -153,7 +189,7 @@ SELECT count(*) -- 1112
     JOIN FILM_CATEGORY FC 
     ON f.FILM_ID = fc.FILM_ID 
     JOIN CATEGORY C 
-    ON fc.CATEGORY_ID = c.CATEGORY_ID 
+    ON fc.CATEGORY_ID = c.CATEGORY_ID
 WHERE c.NAME = 'Action';
 
 
