@@ -53,7 +53,7 @@ CREATE TABLE prodTbl (
 CREATE TABLE deliverTbl (
     deliverNo  INT AUTO_INCREMENT PRIMARY KEY,  -- 배송 일련번호
     prodName VARCHAR(5),                        -- 배송할 물건          
-    account INT UNIQUE                          -- 배송할 물건개수
+    account INT                                 -- 배송할 물건개수
 );
 
 
@@ -73,7 +73,7 @@ END;
 SHOW triggers FROM SHOPPINGMALL;
 
 INSERT INTO USERTBL VALUES ('AAB', 'AAB', 2004, 'AA', '010', '12344564', 170, '2024-06-10', DEFAULT);
-SELECT * FROM USERTBL U WHERE USERID = 'AAB';
+SELECT * FROM USERTBL U WHERE USERID ='AAB';
 
 /* 고객 정보 신규 등록 시 태어난 연도 검증용 트리거 : insert event */
 DROP TRIGGER IF EXISTS usertbl_insertTrg_chk_birthYr;
@@ -148,35 +148,114 @@ SELECT * FROM BACKUP_USERTBL BU ;
  * 
  * insert        -> update          -> insert 
  * */
+-- 내가 한 코드
 DROP TRIGGER busin_prcsTrg;
 CREATE TRIGGER busin_prcsTrg
     AFTER INSERT
     ON ordertbl
     FOR EACH ROW 
 BEGIN
-    UPDATE PRODTBL 
-    SET account := account - NEW.orderamount
+    -- prodtbl 에서 수량 확인
+    SET @oldAccount = 0;
+    SELECT account INTO @oldAccount
+    FROM PRODTBL P 
     WHERE prodName = NEW.prodName;
 
-    INSERT delivertbl(prodName, account) 
-    VALUES (NEW.prodName, NEW.orderamount);
+    IF @oldAccount <= 0 THEN
+        -- 경고 메세지 출력
+        SIGNAL SQLSTATE '45000'
+            SET message_text = '수량 부족';
+    ELSE
+        UPDATE PRODTBL 
+        SET account := account - NEW.orderamount
+        WHERE prodName = NEW.prodName;
+    
+        INSERT delivertbl(prodName, account) 
+        VALUES (NEW.prodName, NEW.orderamount);
+    END IF;
 END;
+
+SELECT ACCOUNT 
+FROM PRODTBL P 
+WHERE prodName = '배';
+
+-- 강사님이 한 코드
+/* orderTbl 의 event에 따라 동작하는 trigger 
+ * 
+ * 재고 계산(prodTbl)을 수행, update event 발생
+ * 
+ * */
+drop trigger if exists orderTrg;
+
+create trigger orderTrg
+    -- event 지정
+    after insert
+    -- event가 발생되는 table
+    on orderTbl
+    -- 처리되는 row 대상
+    for each row
+begin
+    -- 상기의 3가지 조건에 부합되는 event일 경우
+    -- 실제 수행해야 할 비즈니스 로직을 작성.
+    -- 주문 제품에 대한 수량만큼 재고 수량 차감 update 처리. => DML 로 비즈니스 로직 구현.
+    
+    -- new.orderamount : orderTbl.orderamount 에 insert 된 데이터.
+    --                   orderTbl.orderamount 기존에 없던 데이터가 신규로 삽입되었으니,
+    --                   그래서, 지시자를 new 를 사용.
+    
+    -- account - new.orderamount : 기존 재고 수량 - 신규 주문 수량
+    update prodtbl set account = account - new.orderamount
+     where prodName = new.prodname;
+end;
+
+
+
+
+/* prodTbl 의 event에 따라 동작하는 trigger 
+ * 
+ * 배송(deliverTbl)을 수행.
+ * 
+ * */
+drop trigger if exists prodTrg; 
+
+create trigger prodTrg
+    -- prodTbl 에서 발생하는 update 에 대한 모든 row 가 감지되면
+    -- begin 아래의 비즈니스 로직을 수행.
+    after update
+    on prodTbl
+    for each row
+begin
+    -- 배송 시작을 위한 배송 테이블에 정보를 입력
+    -- 제품 배송을 위한 제품 수량을 확인.
+    -- 따라서, 발생되었던 event 정보에서 수량 정보를 확인.
+    -- prodTbl.account에 대한 값이 변경 전과 변경 후의 데이터가 공존.
+    
+    declare orderAmount int;
+
+    -- prodTbl.account 의 변경 전 데이터와 변경 후 데이터를 사용해서 계산.
+    set orderAmount = old.account - new.account;
+
+    insert into delivertbl(prodName, account)
+    values(new.prodName, orderAmount);
+    
+end;
+
 
 truncate TABLE orderTbl;
 truncate TABLE prodTbl;
 truncate TABLE DELIVERTBL ;
 
 -- 재고 테이블에 테스트용 데이터 등록
-insert into prodTbl values('사과', 100);
-insert into prodTbl values('배', 100);
-insert into prodTbl values('귤', 100);
+insert into prodTbl values('사과', 50);
+insert into prodTbl values('배', 30);
+insert into prodTbl values('귤', 50);
 
-insert into orderTbl values (null, 'cus1', '배', 5);
+insert into orderTbl values (null, 'cus1', '배', 10);
 
 SELECT * FROM ORDERTBL O ;
 SELECT * FROM PRODTBL P ;
 SELECT * FROM DELIVERTBL D ;
-
+SELECT @oldAccount;
 
 
 
